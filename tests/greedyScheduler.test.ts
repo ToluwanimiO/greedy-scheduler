@@ -107,4 +107,6 @@ describe("generateGreedySchedule", () => {
     ], 120, "balanced-progress");
     const result = generateGreedySchedule(input);
     expect(result.allocations.every((a) => a.scheduledMinutes > 0)).toBe(true);
-    expect(result.me
+    expect(result.metrics.hardConstraintViolations).toBe(0);
+  });
+});
