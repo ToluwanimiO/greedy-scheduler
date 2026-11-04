@@ -37,54 +37,111 @@ function validateInput(input: SchedulingInput): void {
     if (!goalIds.has(task.goalId)) {
       throw new Error(`Task "${task.id}" references an unknown goal.`);
     }
-    if (!Number.isInteger(task.weeklyTargetMinutes) || task.weeklyTargetMinutes <= 0) {
-      throw new Error(`Task "${task.id}" must have a positive integer weekly target.`);
+    if (
+      !Number.isInteger(task.weeklyTargetMinutes) ||
+      task.weeklyTargetMinutes <= 0
+    ) {
+      throw new Error(
+        `Task "${task.id}" must have a positive integer weekly target.`,
+      );
     }
-    if (!Number.isInteger(task.priority) || task.priority < 1 || task.priority > 5) {
-      throw new Error(`Task "${task.id}" priority must be an integer from 1 to 5.`);
+    if (
+      !Number.isInteger(task.priority) ||
+      task.priority < 1 ||
+      task.priority > 5
+    ) {
+      throw new Error(
+        `Task "${task.id}" priority must be an integer from 1 to 5.`,
+      );
     }
-    if (!Number.isInteger(task.minSessionMinutes) || task.minSessionMinutes <= 0) {
-      throw new Error(`Task "${task.id}" must have a positive minimum session.`);
+    if (
+      !Number.isInteger(task.minSessionMinutes) ||
+      task.minSessionMinutes <= 0
+    ) {
+      throw new Error(
+        `Task "${task.id}" must have a positive minimum session.`,
+      );
     }
     if (task.minSessionMinutes > task.weeklyTargetMinutes) {
-      throw new Error(`Task "${task.id}" minimum session exceeds its weekly target.`);
+      throw new Error(
+        `Task "${task.id}" minimum session exceeds its weekly target.`,
+      );
     }
     if (
       task.maxMinutesPerDay !== undefined &&
       (!Number.isInteger(task.maxMinutesPerDay) || task.maxMinutesPerDay <= 0)
     ) {
-      throw new Error(`Task "${task.id}" daily maximum must be a positive integer.`);
+      throw new Error(
+        `Task "${task.id}" daily maximum must be a positive integer.`,
+      );
     }
     if (task.deadline) {
-      assertIntegerInRange(task.deadline.day, 1, 7, `Task "${task.id}" deadline day`);
-      assertIntegerInRange(task.deadline.minuteOfDay, 0, 1439, `Task "${task.id}" deadline time`);
+      assertIntegerInRange(
+        task.deadline.day,
+        1,
+        7,
+        `Task "${task.id}" deadline day`,
+      );
+      assertIntegerInRange(
+        task.deadline.minuteOfDay,
+        0,
+        1439,
+        `Task "${task.id}" deadline time`,
+      );
     }
   }
 
   for (const entry of input.availability) {
     assertIntegerInRange(entry.day, 1, 7, "Availability day");
-    const windows = [...entry.windows].sort((a, b) => a.startMinute - b.startMinute);
+    const windows = [...entry.windows].sort(
+      (a, b) => a.startMinute - b.startMinute,
+    );
     for (const window of windows) {
-      assertIntegerInRange(window.startMinute, DAY_START, DAY_END, "Availability start");
-      assertIntegerInRange(window.endMinute, DAY_START, DAY_END, "Availability end");
+      assertIntegerInRange(
+        window.startMinute,
+        DAY_START,
+        DAY_END,
+        "Availability start",
+      );
+      assertIntegerInRange(
+        window.endMinute,
+        DAY_START,
+        DAY_END,
+        "Availability end",
+      );
       if (window.startMinute >= window.endMinute) {
         throw new Error("Availability windows must have positive duration.");
       }
     }
     for (let i = 1; i < windows.length; i++) {
       if (windows[i].startMinute < windows[i - 1].endMinute) {
-        throw new Error(`Availability windows overlap on weekday ${entry.day}.`);
+        throw new Error(
+          `Availability windows overlap on weekday ${entry.day}.`,
+        );
       }
     }
   }
 
   for (const commitment of input.fixedCommitments) {
-    assertIntegerInRange(commitment.startMinute, DAY_START, DAY_END, "Commitment start");
-    assertIntegerInRange(commitment.endMinute, DAY_START, DAY_END, "Commitment end");
+    assertIntegerInRange(
+      commitment.startMinute,
+      DAY_START,
+      DAY_END,
+      "Commitment start",
+    );
+    assertIntegerInRange(
+      commitment.endMinute,
+      DAY_START,
+      DAY_END,
+      "Commitment end",
+    );
     if (commitment.startMinute >= commitment.endMinute) {
-      throw new Error(`Commitment "${commitment.id}" must have positive duration.`);
+      throw new Error(
+        `Commitment "${commitment.id}" must have positive duration.`,
+      );
     }
-    for (const day of commitment.days) assertIntegerInRange(day, 1, 7, "Commitment day");
+    for (const day of commitment.days)
+      assertIntegerInRange(day, 1, 7, "Commitment day");
   }
 }
 
@@ -139,9 +196,7 @@ function buildFreeWindows(input: SchedulingInput): FreeWindow[] {
     }
   }
 
-  return result.sort(
-    (a, b) => a.day - b.day || a.startMinute - b.startMinute,
-  );
+  return result.sort((a, b) => a.day - b.day || a.startMinute - b.startMinute);
 }
 
 function compareDeadlines(a: Task, b: Task): number {
@@ -154,23 +209,37 @@ function compareDeadlines(a: Task, b: Task): number {
   );
 }
 
-function orderTasks(tasks: Task[], strategy: SchedulingInput["preferences"]["strategy"]): Task[] {
+function orderTasks(
+  tasks: Task[],
+  strategy: SchedulingInput["preferences"]["strategy"],
+): Task[] {
   const copy = [...tasks];
 
   if (strategy === "priority-first") {
     return copy.sort(
-      (a, b) => b.priority - a.priority || compareDeadlines(a, b) || a.id.localeCompare(b.id),
+      (a, b) =>
+        b.priority - a.priority ||
+        compareDeadlines(a, b) ||
+        a.id.localeCompare(b.id),
     );
   }
 
   if (strategy === "deadline-first") {
     return copy.sort(
-      (a, b) => compareDeadlines(a, b) || b.priority - a.priority || a.id.localeCompare(b.id),
+      (a, b) =>
+        compareDeadlines(a, b) ||
+        b.priority - a.priority ||
+        a.id.localeCompare(b.id),
     );
   }
 
   // Balanced mode uses repeated rounds, handled by the scheduler.
-  return copy.sort((a, b) => b.priority - a.priority || compareDeadlines(a, b) || a.id.localeCompare(b.id));
+  return copy.sort(
+    (a, b) =>
+      b.priority - a.priority ||
+      compareDeadlines(a, b) ||
+      a.id.localeCompare(b.id),
+  );
 }
 
 function isAfterDeadline(day: Weekday, endMinute: number, task: Task): boolean {
@@ -201,17 +270,19 @@ function taskReasons(
 
   if (
     task.maxMinutesPerDay !== undefined &&
-    [...dailyMinutes.entries()].some(([key, minutes]) =>
-      key.startsWith(`${task.id}:`) && minutes >= task.maxMinutesPerDay!,
+    [...dailyMinutes.entries()].some(
+      ([key, minutes]) =>
+        key.startsWith(`${task.id}:`) && minutes >= task.maxMinutesPerDay!,
     )
   ) {
     reasons.add("daily-limit-reached");
   }
 
   const maxWindow = eligibleWindows.reduce((max, window) => {
-    const end = task.deadline && window.day === task.deadline.day
-      ? Math.min(window.endMinute, task.deadline.minuteOfDay)
-      : window.endMinute;
+    const end =
+      task.deadline && window.day === task.deadline.day
+        ? Math.min(window.endMinute, task.deadline.minuteOfDay)
+        : window.endMinute;
     return Math.max(max, end - window.startMinute);
   }, 0);
 
@@ -228,6 +299,7 @@ function allocateOneSession(
   windows: FreeWindow[],
   sessions: ScheduledSession[],
   dailyMinutes: Map<string, number>,
+  maxSessionMinutes?: number,
 ): number {
   const alreadyScheduled = sessions
     .filter((session) => session.taskId === task.id)
@@ -241,14 +313,16 @@ function allocateOneSession(
 
     const dayKey = `${task.id}:${window.day}`;
     const usedToday = dailyMinutes.get(dayKey) ?? 0;
-    const dailyRemaining = task.maxMinutesPerDay === undefined
-      ? Number.POSITIVE_INFINITY
-      : task.maxMinutesPerDay - usedToday;
+    const dailyRemaining =
+      task.maxMinutesPerDay === undefined
+        ? Number.POSITIVE_INFINITY
+        : task.maxMinutesPerDay - usedToday;
     if (dailyRemaining <= 0) continue;
 
-    const deadlineEnd = task.deadline && window.day === task.deadline.day
-      ? Math.min(window.endMinute, task.deadline.minuteOfDay)
-      : window.endMinute;
+    const deadlineEnd =
+      task.deadline && window.day === task.deadline.day
+        ? Math.min(window.endMinute, task.deadline.minuteOfDay)
+        : window.endMinute;
     const available = deadlineEnd - window.startMinute;
     if (available <= 0) continue;
 
@@ -276,8 +350,17 @@ function allocateOneSession(
       if (windows[i].startMinute >= windows[i].endMinute) windows.splice(i, 1);
       return duration;
     }
+    const allocationLimit = maxSessionMinutes ?? Infinity;
+    const wouldLeaveTooLittleTime =
+      remainingWeekly > allocationLimit &&
+      remainingWeekly - allocationLimit < task.minSessionMinutes;
 
-    const duration = Math.min(remainingWeekly, dailyRemaining, available);
+    const duration = Math.min(
+      remainingWeekly,
+      dailyRemaining,
+      available,
+      wouldLeaveTooLittleTime ? remainingWeekly : allocationLimit,
+    );
     if (duration < task.minSessionMinutes) continue;
 
     sessions.push({
@@ -308,12 +391,18 @@ function allocateTaskFully(
 
     const total = sessions
       .filter((session) => session.taskId === task.id)
-      .reduce((sum, session) => sum + session.endMinute - session.startMinute, 0);
+      .reduce(
+        (sum, session) => sum + session.endMinute - session.startMinute,
+        0,
+      );
     if (total >= task.weeklyTargetMinutes || !task.splittable) return;
   }
 }
 
-export function validateSchedule(input: SchedulingInput, sessions: ScheduledSession[]): string[] {
+export function validateSchedule(
+  input: SchedulingInput,
+  sessions: ScheduledSession[],
+): string[] {
   const errors: string[] = [];
   const tasks = new Map(input.tasks.map((task) => [task.id, task]));
   const daily = new Map<string, number>();
@@ -337,7 +426,9 @@ export function validateSchedule(input: SchedulingInput, sessions: ScheduledSess
     }
 
     if (isAfterDeadline(session.day, session.endMinute, task)) {
-      errors.push(`Session "${session.id}" exceeds task "${task.id}" deadline.`);
+      errors.push(
+        `Session "${session.id}" exceeds task "${task.id}" deadline.`,
+      );
     }
 
     const duration = session.endMinute - session.startMinute;
@@ -347,19 +438,23 @@ export function validateSchedule(input: SchedulingInput, sessions: ScheduledSess
     const available = input.availability
       .filter((entry) => entry.day === session.day)
       .flatMap((entry) => entry.windows)
-      .some((window) =>
-        session.startMinute >= window.startMinute &&
-        session.endMinute <= window.endMinute
+      .some(
+        (window) =>
+          session.startMinute >= window.startMinute &&
+          session.endMinute <= window.endMinute,
       );
 
-    if (!available) errors.push(`Session "${session.id}" is outside availability.`);
+    if (!available)
+      errors.push(`Session "${session.id}" is outside availability.`);
 
-    const overlapsCommitment = input.fixedCommitments.some((commitment) =>
-      commitment.days.includes(session.day) &&
-      session.startMinute < commitment.endMinute &&
-      session.endMinute > commitment.startMinute
+    const overlapsCommitment = input.fixedCommitments.some(
+      (commitment) =>
+        commitment.days.includes(session.day) &&
+        session.startMinute < commitment.endMinute &&
+        session.endMinute > commitment.startMinute,
     );
-    if (overlapsCommitment) errors.push(`Session "${session.id}" overlaps a fixed commitment.`);
+    if (overlapsCommitment)
+      errors.push(`Session "${session.id}" overlaps a fixed commitment.`);
   }
 
   const byDay = new Map<Weekday, ScheduledSession[]>();
@@ -367,7 +462,9 @@ export function validateSchedule(input: SchedulingInput, sessions: ScheduledSess
     byDay.set(session.day, [...(byDay.get(session.day) ?? []), session]);
   }
   for (const [day, daySessions] of byDay) {
-    const sorted = [...daySessions].sort((a, b) => a.startMinute - b.startMinute);
+    const sorted = [...daySessions].sort(
+      (a, b) => a.startMinute - b.startMinute,
+    );
     for (let i = 1; i < sorted.length; i++) {
       if (sorted[i].startMinute < sorted[i - 1].endMinute) {
         errors.push(`Sessions overlap on weekday ${day}.`);
@@ -376,8 +473,13 @@ export function validateSchedule(input: SchedulingInput, sessions: ScheduledSess
   }
 
   for (const task of input.tasks) {
-    const taskSessions = sessions.filter((session) => session.taskId === task.id);
-    const total = taskSessions.reduce((sum, session) => sum + session.endMinute - session.startMinute, 0);
+    const taskSessions = sessions.filter(
+      (session) => session.taskId === task.id,
+    );
+    const total = taskSessions.reduce(
+      (sum, session) => sum + session.endMinute - session.startMinute,
+      0,
+    );
     if (total > task.weeklyTargetMinutes) {
       errors.push(`Task "${task.id}" exceeds its weekly target.`);
     }
@@ -388,7 +490,9 @@ export function validateSchedule(input: SchedulingInput, sessions: ScheduledSess
 
     for (const session of taskSessions) {
       if (session.endMinute - session.startMinute < task.minSessionMinutes) {
-        errors.push(`Task "${task.id}" has a session shorter than its minimum.`);
+        errors.push(
+          `Task "${task.id}" has a session shorter than its minimum.`,
+        );
       }
     }
 
@@ -404,8 +508,9 @@ export function validateSchedule(input: SchedulingInput, sessions: ScheduledSess
   return errors;
 }
 
-export function generateGreedySchedule(input: SchedulingInput): SchedulingResult {
-  console.log("Generating schedule with input:", input);
+export function generateGreedySchedule(
+  input: SchedulingInput,
+): SchedulingResult {
   validateInput(input);
 
   const windows = buildFreeWindows(input);
@@ -426,12 +531,22 @@ export function generateGreedySchedule(input: SchedulingInput): SchedulingResult
             .reduce((sum, s) => sum + s.endMinute - s.startMinute, 0);
           return scheduled / task.weeklyTargetMinutes;
         };
-        return getRatio(a) - getRatio(b) || b.priority - a.priority || compareDeadlines(a, b);
+        return (
+          getRatio(a) - getRatio(b) ||
+          b.priority - a.priority ||
+          compareDeadlines(a, b)
+        );
       });
 
       for (const task of ranked) {
         const before = sessions.length;
-        allocateOneSession(task, windows, sessions, dailyMinutes);
+        allocateOneSession(
+          task,
+          windows,
+          sessions,
+          dailyMinutes,
+          task.minSessionMinutes,
+        );
         if (sessions.length > before) madeProgress = true;
       }
     }
@@ -441,24 +556,27 @@ export function generateGreedySchedule(input: SchedulingInput): SchedulingResult
     }
   }
 
-  sessions.sort(
-    (a, b) => a.day - b.day || a.startMinute - b.startMinute,
-  );
+  sessions.sort((a, b) => a.day - b.day || a.startMinute - b.startMinute);
 
   const allocations: TaskAllocation[] = input.tasks.map((task) => {
     const scheduledMinutes = sessions
       .filter((session) => session.taskId === task.id)
-      .reduce((sum, session) => sum + session.endMinute - session.startMinute, 0);
+      .reduce(
+        (sum, session) => sum + session.endMinute - session.startMinute,
+        0,
+      );
     const remainingMinutes = task.weeklyTargetMinutes - scheduledMinutes;
-    const status = remainingMinutes === 0
-      ? "complete"
-      : scheduledMinutes > 0
-        ? "partial"
-        : "unscheduled";
+    const status =
+      remainingMinutes === 0
+        ? "complete"
+        : scheduledMinutes > 0
+          ? "partial"
+          : "unscheduled";
 
-    const reasons: UnscheduledReason[] = remainingMinutes > 0
-      ? taskReasons(task, scheduledMinutes, windows, dailyMinutes)
-      : [];
+    const reasons: UnscheduledReason[] =
+      remainingMinutes > 0
+        ? taskReasons(task, scheduledMinutes, windows, dailyMinutes)
+        : [];
 
     return {
       taskId: task.id,
@@ -470,12 +588,20 @@ export function generateGreedySchedule(input: SchedulingInput): SchedulingResult
     };
   });
 
-  const totalRequestedMinutes = input.tasks.reduce((sum, task) => sum + task.weeklyTargetMinutes, 0);
-  const totalScheduledMinutes = sessions.reduce((sum, session) => sum + session.endMinute - session.startMinute, 0);
+  const totalRequestedMinutes = input.tasks.reduce(
+    (sum, task) => sum + task.weeklyTargetMinutes,
+    0,
+  );
+  const totalScheduledMinutes = sessions.reduce(
+    (sum, session) => sum + session.endMinute - session.startMinute,
+    0,
+  );
   const errors = validateSchedule(input, sessions);
 
   if (errors.length > 0) {
-    throw new Error(`Generated schedule violates constraints:\n${errors.join("\n")}`);
+    throw new Error(
+      `Generated schedule violates constraints:\n${errors.join("\n")}`,
+    );
   }
 
   return {
@@ -484,7 +610,10 @@ export function generateGreedySchedule(input: SchedulingInput): SchedulingResult
     metrics: {
       totalRequestedMinutes,
       totalScheduledMinutes,
-      completionRatio: totalRequestedMinutes === 0 ? 1 : totalScheduledMinutes / totalRequestedMinutes,
+      completionRatio:
+        totalRequestedMinutes === 0
+          ? 1
+          : totalScheduledMinutes / totalRequestedMinutes,
       hardConstraintViolations: errors.length,
     },
   };

@@ -71,7 +71,6 @@ describe("generateGreedySchedule", () => {
       }),
     ], 120);
     const result = generateGreedySchedule(input);
-    console.log(result)
     expect(result.sessions).toHaveLength(0);
     expect(result.allocations[0].remainingMinutes).toBe(60);
   });
