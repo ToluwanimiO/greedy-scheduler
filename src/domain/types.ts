@@ -27,7 +27,7 @@ export type Task = {
   splittable: boolean;
   minSessionMinutes: number;
   preferredDays?: Weekday[];
-  preferredTimeOfDay?: ("morning" | "afternoon" | "evening")[];
+  preferredTimeOfDay?: ("morning" | "afternoon" | "evening" | "other")[];
 };
 
 export type WeeklyAvailability = {

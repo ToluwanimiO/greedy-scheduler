@@ -1,4 +1,4 @@
-# Goal-to-Timetable — Greedy Scheduler (Day 2)
+# Goal-to-Timetable — Greedy Scheduler
 
 A small, framework-independent TypeScript scheduling engine and Vitest baseline suite.
 
