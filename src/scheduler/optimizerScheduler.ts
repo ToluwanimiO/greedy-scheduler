@@ -146,6 +146,7 @@ function buildFreeWindows(input: SchedulingInput): FreeWindow[] {
  * Candidate starts use 30-minute boundaries. Durations are generally
  * multiples of 30, with the exact remaining target also considered.
  */
+
 function generateCandidates(
   task: Task,
   sessions: ScheduledSession[],
@@ -172,7 +173,7 @@ function generateCandidates(
 
     if (dailyRemaining <= 0) continue;
 
-    // A session must end at or before its task's deadline.
+    // Respect the task's deadline.
     let windowEnd = window.endMinute;
 
     if (task.deadline) {
@@ -186,35 +187,103 @@ function generateCandidates(
       }
     }
 
-    const maximumDuration = Math.min(
-      remaining,
-      dailyRemaining,
-      windowEnd - window.startMinute,
-    );
+    // Try every 30-minute start position in this free window.
+    const firstStart =
+      Math.ceil(window.startMinute / SLOT_MINUTES) * SLOT_MINUTES;
 
-    if (maximumDuration < task.minSessionMinutes) continue;
+    for (
+      let startMinute = firstStart;
+      startMinute < windowEnd;
+      startMinute += SLOT_MINUTES
+    ) {
+      const availableMinutes = windowEnd - startMinute;
 
-    // An unsplittable task must fit into one uninterrupted session.
-    if (!task.splittable) {
-      if (
-        alreadyScheduled > 0 ||
-        remaining > dailyRemaining ||
-        remaining > windowEnd - window.startMinute
-      ) {
+      const maximumDuration = Math.min(
+        remaining,
+        dailyRemaining,
+        availableMinutes,
+      );
+
+      if (maximumDuration < task.minSessionMinutes) continue;
+
+      // An unsplittable task must fit entirely into one session.
+      if (!task.splittable) {
+        if (
+          alreadyScheduled > 0 ||
+          remaining > dailyRemaining ||
+          remaining > availableMinutes
+        ) {
+          continue;
+        }
+
+        const endMinute = startMinute + remaining;
+
+        const hasOverlap = sessions.some(
+          (session) =>
+            session.day === window.day &&
+            overlaps(
+              startMinute,
+              endMinute,
+              session.startMinute,
+              session.endMinute,
+            ),
+        );
+
+        if (hasOverlap) continue;
+
+        candidates.push({
+          id: `${task.id}-${window.day}-${startMinute}-${endMinute}`,
+          taskId: task.id,
+          day: window.day,
+          startMinute,
+          endMinute,
+        });
+
         continue;
       }
 
-      const startMinute =
-        Math.ceil(window.startMinute / SLOT_MINUTES) *
+      // Generate possible durations for this particular start time.
+      const minimumDuration =
+        Math.ceil(task.minSessionMinutes / SLOT_MINUTES) *
         SLOT_MINUTES;
 
-      const endMinute = startMinute + remaining;
+      const possibleDurations = new Set<number>();
 
-      if (
-        endMinute <= windowEnd &&
-        endMinute <= window.startMinute +
-          (windowEnd - window.startMinute)
+      for (
+        let minutes =
+          Math.floor(maximumDuration / SLOT_MINUTES) * SLOT_MINUTES;
+        minutes >= minimumDuration;
+        minutes -= SLOT_MINUTES
       ) {
+        possibleDurations.add(minutes);
+      }
+
+      // Also allow the exact remaining target when it fits.
+      if (
+        remaining <= maximumDuration &&
+        remaining >= task.minSessionMinutes
+      ) {
+        possibleDurations.add(remaining);
+      }
+
+      for (const sessionDuration of possibleDurations) {
+        const endMinute = startMinute + sessionDuration;
+
+        if (endMinute > windowEnd) continue;
+
+        const hasOverlap = sessions.some(
+          (session) =>
+            session.day === window.day &&
+            overlaps(
+              startMinute,
+              endMinute,
+              session.startMinute,
+              session.endMinute,
+            ),
+        );
+
+        if (hasOverlap) continue;
+
         candidates.push({
           id: `${task.id}-${window.day}-${startMinute}-${endMinute}`,
           taskId: task.id,
@@ -223,69 +292,12 @@ function generateCandidates(
           endMinute,
         });
       }
-
-      continue;
-    }
-
-    const minimumDuration =
-      Math.ceil(task.minSessionMinutes / SLOT_MINUTES) *
-      SLOT_MINUTES;
-
-    const possibleDurations = new Set<number>();
-
-    for (
-      let minutes = Math.floor(maximumDuration / SLOT_MINUTES) *
-        SLOT_MINUTES;
-      minutes >= minimumDuration;
-      minutes -= SLOT_MINUTES
-    ) {
-      possibleDurations.add(minutes);
-    }
-
-    // Include the exact remaining amount when it fits. This allows
-    // targets that are not multiples of 30 minutes to be completed.
-    if (
-      remaining <= maximumDuration &&
-      remaining >= task.minSessionMinutes
-    ) {
-      possibleDurations.add(remaining);
-    }
-
-    const startMinute =
-      Math.ceil(window.startMinute / SLOT_MINUTES) *
-      SLOT_MINUTES;
-
-    for (const sessionDuration of possibleDurations) {
-      const endMinute = startMinute + sessionDuration;
-
-      if (endMinute > windowEnd) continue;
-
-      // Do not overlap a session already in the candidate schedule.
-      const hasOverlap = sessions.some(
-        (session) =>
-          session.day === window.day &&
-          overlaps(
-            startMinute,
-            endMinute,
-            session.startMinute,
-            session.endMinute,
-          ),
-      );
-
-      if (hasOverlap) continue;
-
-      candidates.push({
-        id: `${task.id}-${window.day}-${startMinute}-${endMinute}`,
-        taskId: task.id,
-        day: window.day,
-        startMinute,
-        endMinute,
-      });
     }
   }
 
   return candidates;
 }
+
 
 function makeState(
   input: SchedulingInput,
