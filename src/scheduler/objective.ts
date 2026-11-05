@@ -6,18 +6,16 @@ import type {
 } from "../domain/types";
 
 export const OBJECTIVE_WEIGHTS = {
-  deadlineSuccess: 0.35,
-  workCoverage: 0.25,
+  deadlineSuccess: 0.40,
+  workCoverage: 0.30,
   priorityAlignment: 0.20,
-  lowTaskSwitching: 0.12,
-  preferenceSatisfaction: 0.08,
+  preferenceSatisfaction: 0.10,
 } as const;
 
 export type ObjectiveMetrics = {
   deadlineSuccess: number;
   workCoverage: number;
   priorityAlignment: number;
-  lowTaskSwitching: number;
   preferenceSatisfaction: number;
   score: number;
 };
@@ -147,37 +145,6 @@ export function scoreSchedule(
             priorityWeightedMinutes / (maxPriority * totalScheduled),
           );
 
-  // X: proportion of possible adjacent-session transitions that are not switches.
-  const sessionsByDay = new Map<number, ScheduledSession[]>();
-
-  for (const session of sessions) {
-    const daySessions = sessionsByDay.get(session.day) ?? [];
-    daySessions.push(session);
-    sessionsByDay.set(session.day, daySessions);
-  }
-
-  let possibleSwitches = 0;
-  let actualSwitches = 0;
-
-  for (const daySessions of sessionsByDay.values()) {
-    const ordered = [...daySessions].sort(
-      (a, b) => a.startMinute - b.startMinute,
-    );
-
-    possibleSwitches += Math.max(0, ordered.length - 1);
-
-    for (let i = 1; i < ordered.length; i++) {
-      if (ordered[i].taskId !== ordered[i - 1].taskId) {
-        actualSwitches++;
-      }
-    }
-  }
-
-  const lowTaskSwitching =
-    possibleSwitches === 0
-      ? 1
-      : 1 - actualSwitches / possibleSwitches;
-
   // F: fraction of scheduled minutes matching all specified preferences.
   const preferenceSatisfaction =
     totalScheduled === 0
@@ -196,7 +163,6 @@ export function scoreSchedule(
       OBJECTIVE_WEIGHTS.deadlineSuccess * deadlineSuccess +
       OBJECTIVE_WEIGHTS.workCoverage * workCoverage +
       OBJECTIVE_WEIGHTS.priorityAlignment * priorityAlignment +
-      OBJECTIVE_WEIGHTS.lowTaskSwitching * lowTaskSwitching +
       OBJECTIVE_WEIGHTS.preferenceSatisfaction * preferenceSatisfaction
     );
 
@@ -204,7 +170,6 @@ export function scoreSchedule(
     deadlineSuccess,
     workCoverage,
     priorityAlignment,
-    lowTaskSwitching,
     preferenceSatisfaction,
     score,
   };

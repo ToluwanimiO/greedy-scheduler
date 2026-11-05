@@ -4,7 +4,7 @@
 ## Objective
 
 Find a feasible weekly timetable that maximizes a weighted score across
-deadline success, work coverage, priority alignment, low task switching,
+deadline success, work coverage, priority alignment,
 and preference satisfaction.
 
 ## Decision variables
@@ -46,10 +46,6 @@ P — Priority alignment:
 Sum(priority * scheduled minutes) /
 (maximum task priority * total scheduled minutes).
 
-X — Low task switching:
-1 - actual task switches / maximum possible switches for the
-schedule's daily session counts.
-
 F — Preference satisfaction:
 Scheduled minutes satisfying all specified soft preferences /
 total scheduled minutes.
@@ -58,13 +54,12 @@ Defined edge cases:
 - No deadline-bearing tasks: D = 1.
 - No requested work: W = 1.
 - No scheduled work: P = 0 and X = 1.
-- No possible switches: X = 1.
 - No preferences: F = 1.
 - Preferences exist but no work is scheduled: F = 0.
 
 ## Initial weights
 
-Score = 100 * (0.35D + 0.25W + 0.20P + 0.12X + 0.08F)
+Score = 100 * (0.40D + 0.30W + 0.20P + 0.10F)
 
 Weights are initial design hypotheses, not universal constants.
 All metrics must be calculated using the same definitions for every
