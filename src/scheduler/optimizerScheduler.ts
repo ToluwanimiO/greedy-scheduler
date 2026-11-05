@@ -26,6 +26,8 @@ type SearchState = {
   sessions: ScheduledSession[];
   score: number;
   scheduledMinutes: number;
+  deadlineSuccess: number;
+  workCoverage: number;
 };
 
 function duration(session: ScheduledSession): number {
@@ -294,10 +296,14 @@ function makeState(
       a.day - b.day || a.startMinute - b.startMinute,
   );
 
+  const metrics = scoreSchedule(input, sortedSessions);
+
   return {
     sessions: sortedSessions,
-    score: scoreSchedule(input, sortedSessions).score,
+    score: metrics.score,
     scheduledMinutes: totalMinutes(sortedSessions),
+    deadlineSuccess: metrics.deadlineSuccess,
+    workCoverage: metrics.workCoverage,
   };
 }
 
@@ -313,11 +319,18 @@ function stateKey(state: SearchState): string {
 }
 
 function compareStates(a: SearchState, b: SearchState): number {
-  // Prefer a higher objective score, then more scheduled work.
-  return (
-    b.score - a.score ||
-    b.scheduledMinutes - a.scheduledMinutes
-  );
+  // 1. Prefer higher deadline success.
+  if (a.deadlineSuccess !== b.deadlineSuccess) {
+    return b.deadlineSuccess - a.deadlineSuccess;
+  }
+
+  // 2. Prefer higher work coverage.
+  if (a.workCoverage !== b.workCoverage) {
+    return b.workCoverage - a.workCoverage;
+  }
+
+  // 3. If both are equivalent, prefer the higher weighted score.
+  return b.score - a.score;
 }
 
 function createAllocations(
